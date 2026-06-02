@@ -117,6 +117,34 @@ fn cli_build_search_get_and_members_support_json_output() {
     );
 }
 
+#[test]
+fn cli_build_then_query_with_default_index_paths() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    write_fixture_corpus(&source);
+
+    let build = Command::new(env!("CARGO_BIN_EXE_cardex"))
+        .current_dir(temp.path())
+        .args([
+            "build",
+            "--source",
+            source.to_str().expect("utf-8 source"),
+            "--json",
+        ])
+        .output()
+        .expect("build command runs");
+    assert_success(&build);
+
+    let search = Command::new(env!("CARGO_BIN_EXE_cardex"))
+        .current_dir(temp.path())
+        .args(["search", "frame force", "--json"])
+        .output()
+        .expect("search command runs");
+    assert_success(&search);
+    let search_json: Value = serde_json::from_slice(&search.stdout).expect("search json");
+    assert_eq!(search_json[0]["symbol"], "cAnalysisResults.FrameForce");
+}
+
 fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_cardex"));
     Command::new(bin)
