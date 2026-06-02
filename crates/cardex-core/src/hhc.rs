@@ -86,23 +86,35 @@ pub(crate) fn title_base(title: &str) -> String {
     let mut value = normalize_space(title);
     for suffix in [
         " Method",
+        " Property",
         " Interface",
         " Enumeration",
         " Enum",
-        " Property",
         " Object",
         " Class",
     ] {
         if let Some(stripped) = value.strip_suffix(suffix) {
-            value = stripped.to_string();
+            value = stripped.trim_end().to_string();
             break;
         }
     }
+    if let Some(stripped) = value.strip_suffix("()") {
+        value = stripped.trim_end().to_string();
+    }
     value
-        .trim_end_matches(|ch: char| ch == ')' || ch.is_ascii_whitespace())
-        .trim_end_matches(|ch: char| ch == '(' || ch == '_' || ch.is_ascii_digit())
-        .trim()
-        .to_string()
+}
+
+#[allow(dead_code)] // Wired into overload grouping in the next hardening work order.
+pub(crate) fn canonical_base(base: &str) -> String {
+    if let Some(idx) = base.rfind('_') {
+        let suffix = &base[idx + 1..];
+        let is_overload =
+            suffix.len() == 1 && suffix.as_bytes()[0].is_ascii_digit() && suffix != "0";
+        if is_overload {
+            return base[..idx].to_string();
+        }
+    }
+    base.to_string()
 }
 
 pub(crate) fn normalize_space(input: &str) -> String {
@@ -150,4 +162,37 @@ fn normalize_local(value: &str) -> String {
 
 fn selector(css: &str) -> Result<Selector> {
     Selector::parse(css).map_err(|err| CardexError::Parse(format!("invalid selector {css}: {err}")))
+}
+
+#[cfg(test)]
+mod title_base_tests {
+    use super::{canonical_base, title_base};
+
+    #[test]
+    fn title_base_keeps_code_editions_and_overload_suffixes() {
+        assert_eq!(title_base("FrameForce Method"), "FrameForce");
+        assert_eq!(title_base("GetNTC2018 Method"), "GetNTC2018");
+        assert_eq!(title_base("ACI318_14 Property"), "ACI318_14");
+        assert_eq!(title_base("Eurocode_2_2004 Interface"), "Eurocode_2_2004");
+        assert_eq!(
+            title_base("AssembledJointMass_1 Method"),
+            "AssembledJointMass_1"
+        );
+        assert_eq!(title_base("GetChannel_2 Method"), "GetChannel_2");
+        assert_eq!(title_base("GetOffsets3 Method"), "GetOffsets3");
+        assert_eq!(
+            title_base("AssembledJointMass() Method"),
+            "AssembledJointMass"
+        );
+    }
+
+    #[test]
+    fn canonical_base_strips_only_single_digit_overload_suffix() {
+        assert_eq!(canonical_base("AssembledJointMass_1"), "AssembledJointMass");
+        assert_eq!(canonical_base("GetChannel_2"), "GetChannel");
+        assert_eq!(canonical_base("GetASCE716"), "GetASCE716");
+        assert_eq!(canonical_base("ACI318_14"), "ACI318_14");
+        assert_eq!(canonical_base("Eurocode_2_2004"), "Eurocode_2_2004");
+        assert_eq!(canonical_base("FrameForce"), "FrameForce");
+    }
 }
