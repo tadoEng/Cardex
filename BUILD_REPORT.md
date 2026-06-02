@@ -10,7 +10,7 @@ Built and indexed the ETABS API v1 HTML documentation into a searchable Cardex c
 
 | Metric | Value |
 |--------|-------|
-| **Pages Indexed** | 1776 |
+| **Pages Indexed** | 1,776 in the original extracted corpus; 1,798 in the ETABS 23 local smoke build |
 | **Build Time** | ~33 seconds (Rust compilation) + ~1 second (indexing) |
 | **Index Location** | `.cardex/` |
 | **Source** | `C:\Work\Code\etabApi\CSI_API_ETABS_v1_html` |
@@ -70,6 +70,19 @@ cargo run --bin cardex -- members "cPointElm" --index .cardex --json
 ]
 ```
 
+### 3. Related Command
+```bash
+cargo run --bin cardex -- related "cAnalysisResults.FrameForce" --index .cardex --json
+```
+
+**Output:** Returns focused See Also targets for the requested card, for example:
+```json
+[
+  "ETABSv1",
+  "cAnalysisResults"
+]
+```
+
 ---
 
 ## Data Structure
@@ -82,7 +95,7 @@ The ETABS API consists of:
   - Examples (VBA, C#, C++, MATLAB, Python)
   - API Reference (organized by interface)
 
-- **HTML Files**: 1776 documentation pages
+- **HTML Files**: 1,776 documentation pages in the original extracted corpus; 1,798 pages in the ETABS 23 local smoke build
   - Each page contains API reference information
   - Multi-language code examples (C#, VB, C++, F#)
   - Method signatures with parameters and return types
@@ -110,6 +123,11 @@ cargo run --bin cardex -- search "query" --index .cardex --limit 10
 ### Get Interface Members
 ```bash
 cargo run --bin cardex -- members "InterfaceName" --index .cardex --json
+```
+
+### Get Related Documentation
+```bash
+cargo run --bin cardex -- related "SymbolName" --index .cardex --json
 ```
 
 ### Get JSON Output (for Agents)

@@ -19,7 +19,7 @@ docs/
 | Document | Purpose |
 |----------|---------|
 | [Project Overview](superpowers/README.md) | Architecture, features, and development guide |
-| [Build Report](superpowers/build-report-etabs-api.md) | Results from indexing ETABS API (1,776 pages) |
+| [Build Report](superpowers/build-report-etabs-api.md) | Results from indexing ETABS API docs |
 | [MVP Plan](superpowers/plans/2026-06-02-cardex-mvp-cli.md) | Original specification and implementation tasks |
 
 ## 🚀 Getting Started
@@ -40,6 +40,9 @@ cargo run --bin cardex -- search "cPointElm" --index .cardex
 
 # List interface methods
 cargo run --bin cardex -- members "cPointElm" --index .cardex --json
+
+# Follow See Also relationships
+cargo run --bin cardex -- related "cAnalysisResults.FrameForce" --index .cardex --json
 ```
 
 ## 📊 Current Status
@@ -55,6 +58,7 @@ cargo run --bin cardex -- members "cPointElm" --index .cardex --json
 - Main interfaces: **20+**
 - Search performance: **<100ms**
 - Index size: **~500MB**
+- Current ETABS 23 local smoke build: **1,798 pages / 1,801 HHC entries**
 
 ## 🏗️ Architecture
 
@@ -73,7 +77,8 @@ cardex-cli/
     ├── build   - Create index
     ├── search  - Full-text search
     ├── get     - Retrieve card
-    └── members - List interface methods
+    ├── members - List interface methods
+    └── related - Follow See Also relationships
 ```
 
 ## 🔍 API Overview
@@ -118,7 +123,12 @@ Output:
 ]
 ```
 
-### Workflow 3: Get JSON for programmatic use
+### Workflow 3: Follow related documentation
+```bash
+cargo run --bin cardex -- related "cAnalysisResults.FrameForce" --index .cardex --json
+```
+
+### Workflow 4: Get JSON for programmatic use
 ```bash
 cargo run --bin cardex -- search "cPointElm" --index .cardex --json
 ```
@@ -149,7 +159,8 @@ cargo run --bin cardex -- build --help
 - [x] Task 3: Page Extraction & API Cards
 - [x] Task 4: Build Artifacts & DocGraph
 - [x] Task 5: CLI Surface
-- [x] Task 6: Final Verification
+- [x] Task 6: Related Docs CLI
+- [x] Task 7: Final Verification
 - [x] Tested with ETABS API data
 
 See [MVP Plan](superpowers/plans/2026-06-02-cardex-mvp-cli.md) for details.

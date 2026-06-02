@@ -77,6 +77,20 @@ impl CardStore {
             .unwrap_or_default())
     }
 
+    pub fn related(&self, key: &str) -> Result<Vec<String>> {
+        let graph_key = self
+            .get(key)?
+            .and_then(|card| card.symbol)
+            .unwrap_or_else(|| key.to_string());
+
+        Ok(self
+            .graph
+            .related
+            .get(&graph_key)
+            .cloned()
+            .unwrap_or_default())
+    }
+
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
         search_cards(&self.root, query, limit, &self.by_page_id, &self.cards)
     }

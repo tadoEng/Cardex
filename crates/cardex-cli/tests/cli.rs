@@ -66,6 +66,20 @@ fn cli_build_search_get_and_members_support_json_output() {
         members_json,
         serde_json::json!(["cAnalysisResults.BaseReact", "cAnalysisResults.FrameForce"])
     );
+
+    let related = run_cardex([
+        "related",
+        "cAnalysisResults.FrameForce",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&related);
+    let related_json: Value = serde_json::from_slice(&related.stdout).expect("related json");
+    assert_eq!(
+        related_json,
+        serde_json::json!(["cAnalysisResultsSetup.SetCaseSelectedForOutput"])
+    );
 }
 
 fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
@@ -142,6 +156,8 @@ fn api_page(name: &str, signature: &str, remarks: &str) -> String {
           <p>Returns zero if successful; otherwise it returns a nonzero value.</p>
           <h2>Remarks</h2>
           <p>{remarks}</p>
+          <h2>See Also</h2>
+          <p><a href="set_case.htm">cAnalysisResultsSetup.SetCaseSelectedForOutput Method</a></p>
         </body></html>
         "#
     )

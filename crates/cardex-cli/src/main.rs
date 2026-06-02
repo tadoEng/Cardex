@@ -49,6 +49,13 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    Related {
+        symbol: String,
+        #[arg(long, default_value = ".cardex/etabs-api")]
+        index: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -135,6 +142,21 @@ fn main() -> anyhow::Result<()> {
             } else {
                 for member in members {
                     println!("{member}");
+                }
+            }
+        }
+        Command::Related {
+            symbol,
+            index,
+            json,
+        } => {
+            let store = CardStore::open(&index).context("failed to open Cardex index")?;
+            let related = store.related(&symbol).context("related failed")?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&related)?);
+            } else {
+                for target in related {
+                    println!("{target}");
                 }
             }
         }

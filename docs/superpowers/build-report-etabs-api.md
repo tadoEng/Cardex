@@ -10,7 +10,7 @@ Built and indexed the ETABS API v1 HTML documentation into a searchable Cardex c
 
 | Metric | Value |
 |--------|-------|
-| **Pages Indexed** | 1776 |
+| **Pages Indexed** | 1,776 in the original extracted corpus; 1,798 in the ETABS 23 local smoke build |
 | **Build Time** | ~33 seconds (Rust compilation) + ~1 second (indexing) |
 | **Index Location** | `.cardex/` |
 | **Source** | `C:\Work\Code\etabApi\CSI_API_ETABS_v1_html` |
@@ -138,11 +138,26 @@ cargo run --bin cardex -- members "cPointElm" --index .cardex --json
 cargo run --bin cardex -- members "cAreaElm" --index .cardex --json
 ```
 
-### 4. JSON Output (for Agents)
+### 4. Get Related Documentation
+
+```bash
+cargo run --bin cardex -- related "cAnalysisResults.FrameForce" --index .cardex --json
+```
+
+Expected compact output:
+```json
+[
+  "ETABSv1",
+  "cAnalysisResults"
+]
+```
+
+### 5. JSON Output (for Agents)
 
 ```bash
 cargo run --bin cardex -- search "query" --index .cardex --json
 cargo run --bin cardex -- members "Interface" --index .cardex --json
+cargo run --bin cardex -- related "Symbol" --index .cardex --json
 ```
 
 ---
@@ -225,13 +240,18 @@ cardex-cli/
   - [x] Implement `cardex search` command
   - [x] Implement `cardex get` command
   - [x] Implement `cardex members` command
+  - [x] Implement `cardex related` command
   - [x] Add JSON output support
 
-- [x] Task 6: Final Verification
+- [x] Task 6: Related Docs CLI
+  - [x] Add `CardStore::related`
+  - [x] Add CLI JSON output for See Also targets
+
+- [x] Task 7: Final Verification
   - [x] Run `cargo fmt --all`
   - [x] Run `cargo test --workspace`
   - [x] Run `cargo check --workspace`
-  - [x] Tested with ETABS API data (1776 pages)
+  - [x] Tested with ETABS API data
 
 ---
 
@@ -240,7 +260,7 @@ cardex-cli/
 - **Index Build Time**: 34 seconds (includes Rust compilation)
 - **Search Time**: <100ms for typical queries
 - **Index Size**: ~500MB+ (Tantivy index)
-- **Number of Searchable Pages**: 1,776
+- **Number of Searchable Pages**: 1,776 in the original extracted corpus; 1,798 in the ETABS 23 local smoke build
 
 ---
 
@@ -262,7 +282,7 @@ Sample: GetSpringCoupled, GetRestraint, GetConnectivity, etc.
 
 ✅ **Build Test**
 ```
-Source: ETABS API HTML (1,776 pages)
+Source: ETABS API HTML (1,776 original extracted pages; 1,798 ETABS 23 local smoke-build pages)
 Output artifacts: 4 files + search index directory
 Status: All artifacts successfully generated
 ```
@@ -320,6 +340,7 @@ cargo run --bin cardex -- --help
 cargo run --bin cardex -- build --help
 cargo run --bin cardex -- search --help
 cargo run --bin cardex -- members --help
+cargo run --bin cardex -- related --help
 ```
 
 ---

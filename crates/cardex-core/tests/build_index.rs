@@ -47,6 +47,14 @@ fn build_corpus_writes_cards_docgraph_and_search_index() {
             "cAnalysisResults.FrameForce".to_string()
         ]
     );
+
+    let related = store
+        .related("cAnalysisResults.FrameForce")
+        .expect("related succeeds");
+    assert_eq!(
+        related,
+        vec!["cAnalysisResultsSetup.SetCaseSelectedForOutput".to_string()]
+    );
 }
 
 #[test]
@@ -181,6 +189,8 @@ fn api_page(name: &str, signature: &str, remarks: &str) -> String {
           <p>Returns zero if successful; otherwise it returns a nonzero value.</p>
           <h2>Remarks</h2>
           <p>{remarks}</p>
+          <h2>See Also</h2>
+          <p><a href="set_case.htm">cAnalysisResultsSetup.SetCaseSelectedForOutput Method</a></p>
         </body></html>
         "#
     )
