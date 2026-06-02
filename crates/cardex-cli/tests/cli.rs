@@ -1,0 +1,148 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use serde_json::Value;
+
+#[test]
+fn cli_build_search_get_and_members_support_json_output() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    let index = temp.path().join("index");
+    write_fixture_corpus(&source);
+
+    let build = run_cardex([
+        "build",
+        "--source",
+        source.to_str().expect("utf-8 source"),
+        "--out",
+        index.to_str().expect("utf-8 index"),
+        "--corpus",
+        "etabs-api",
+        "--json",
+    ]);
+    assert_success(&build);
+    let build_json: Value = serde_json::from_slice(&build.stdout).expect("build json");
+    assert_eq!(build_json["pages"], 2);
+
+    let search = run_cardex([
+        "search",
+        "frame force",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--limit",
+        "3",
+        "--json",
+    ]);
+    assert_success(&search);
+    let search_json: Value = serde_json::from_slice(&search.stdout).expect("search json");
+    assert_eq!(search_json[0]["symbol"], "cAnalysisResults.FrameForce");
+
+    let get = run_cardex([
+        "get",
+        "cAnalysisResults.FrameForce",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&get);
+    let get_json: Value = serde_json::from_slice(&get.stdout).expect("get json");
+    assert_eq!(get_json["symbol"], "cAnalysisResults.FrameForce");
+    assert_eq!(
+        get_json["returns"],
+        "Returns zero if successful; otherwise it returns a nonzero value."
+    );
+
+    let members = run_cardex([
+        "members",
+        "cAnalysisResults",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&members);
+    let members_json: Value = serde_json::from_slice(&members.stdout).expect("members json");
+    assert_eq!(
+        members_json,
+        serde_json::json!(["cAnalysisResults.BaseReact", "cAnalysisResults.FrameForce"])
+    );
+}
+
+fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_cardex"));
+    Command::new(bin)
+        .args(args)
+        .output()
+        .expect("cardex command runs")
+}
+
+fn assert_success(output: &std::process::Output) {
+    assert!(
+        output.status.success(),
+        "status: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn write_fixture_corpus(source: &Path) {
+    fs::create_dir_all(source.join("html")).expect("create fixture dirs");
+    fs::write(
+        source.join("CSI API ETABS v1.hhc"),
+        r#"
+        <html><body>
+          <ul>
+            <li><object type="text/sitemap"><param name="Name" value="CSI API ETABS v1"></object>
+              <ul>
+                <li><object type="text/sitemap"><param name="Name" value="cAnalysisResults Interface"></object>
+                  <ul>
+                    <li><object type="text/sitemap"><param name="Name" value="BaseReact Method"><param name="Local" value="html/base_react.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="FrameForce Method"><param name="Local" value="html/frame_force.htm"></object></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </body></html>
+        "#,
+    )
+    .expect("write hhc");
+
+    fs::write(
+        source.join("html/frame_force.htm"),
+        api_page(
+            "FrameForce",
+            "int FrameForce(string Name, eItemTypeElm ItemTypeElm, ref int NumberResults)",
+            "Frame force results for line elements.",
+        ),
+    )
+    .expect("write frame force page");
+    fs::write(
+        source.join("html/base_react.htm"),
+        api_page(
+            "BaseReact",
+            "int BaseReact(ref int NumberResults)",
+            "Base reaction results.",
+        ),
+    )
+    .expect("write base react page");
+}
+
+fn api_page(name: &str, signature: &str, remarks: &str) -> String {
+    format!(
+        r#"
+        <html><body>
+          <h1>{name} Method</h1>
+          <pre>{signature}</pre>
+          <table>
+            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+            <tr><td>Name</td><td>string</td><td>Object or case name.</td></tr>
+          </table>
+          <p>Returns zero if successful; otherwise it returns a nonzero value.</p>
+          <h2>Remarks</h2>
+          <p>{remarks}</p>
+        </body></html>
+        "#
+    )
+}

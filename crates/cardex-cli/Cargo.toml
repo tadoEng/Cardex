@@ -1,0 +1,19 @@
+[package]
+name = "cardex-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cardex"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+cardex-core = { path = "../cardex-core" }
+clap.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

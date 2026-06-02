@@ -1,0 +1,23 @@
+/target/
+/.serena/
+
+# Local/proprietary source corpora.
+/data/
+/corpus/
+/raw/
+/extracted/
+/html/
+*.chm
+*.hhc
+*.hhk
+*.htm
+toc_map.json
+
+# Generated Cardex artifacts.
+/.cardex/
+/indexes/
+/markdown/
+**/pages.jsonl
+**/docgraph.json
+**/manifest.json
+**/tantivy/
