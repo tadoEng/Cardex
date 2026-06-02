@@ -22,6 +22,11 @@ fn build_corpus_writes_cards_docgraph_and_search_index() {
     assert!(out.join("docgraph.json").exists());
     assert!(out.join("manifest.json").exists());
     assert!(out.join("tantivy").exists());
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out.join("manifest.json")).expect("manifest reads"),
+    )
+    .expect("manifest json");
+    assert_eq!(manifest["schema_version"], 2);
 
     let store = CardStore::open(&out).expect("store opens");
     let hits = store.search("frame force", 5).expect("search succeeds");
