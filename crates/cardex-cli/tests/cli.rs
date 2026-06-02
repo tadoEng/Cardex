@@ -23,7 +23,7 @@ fn cli_build_search_get_and_members_support_json_output() {
     ]);
     assert_success(&build);
     let build_json: Value = serde_json::from_slice(&build.stdout).expect("build json");
-    assert_eq!(build_json["pages"], 2);
+    assert_eq!(build_json["pages"], 4);
 
     let search = run_cardex([
         "search",
@@ -64,7 +64,12 @@ fn cli_build_search_get_and_members_support_json_output() {
     let members_json: Value = serde_json::from_slice(&members.stdout).expect("members json");
     assert_eq!(
         members_json,
-        serde_json::json!(["cAnalysisResults.BaseReact", "cAnalysisResults.FrameForce"])
+        serde_json::json!([
+            "cAnalysisResults.AssembledJointMass",
+            "cAnalysisResults.AssembledJointMass_1",
+            "cAnalysisResults.BaseReact",
+            "cAnalysisResults.FrameForce"
+        ])
     );
 
     let related = run_cardex([
@@ -80,6 +85,36 @@ fn cli_build_search_get_and_members_support_json_output() {
         related_json,
         serde_json::json!(["cAnalysisResultsSetup.SetCaseSelectedForOutput"])
     );
+
+    let get_base = run_cardex([
+        "get",
+        "cAnalysisResults.AssembledJointMass",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&get_base);
+    let get_base_json: Value = serde_json::from_slice(&get_base.stdout).expect("get base json");
+    assert_eq!(
+        get_base_json["symbol"],
+        "cAnalysisResults.AssembledJointMass"
+    );
+
+    let get_overload = run_cardex([
+        "get",
+        "cAnalysisResults.AssembledJointMass_1",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&get_overload);
+    let get_overload_json: Value =
+        serde_json::from_slice(&get_overload.stdout).expect("get overload json");
+    assert_eq!(
+        get_overload_json["symbol"],
+        "cAnalysisResults.AssembledJointMass_1"
+    );
+    assert_ne!(get_base_json["page_id"], get_overload_json["page_id"]);
 }
 
 fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
@@ -112,6 +147,8 @@ fn write_fixture_corpus(source: &Path) {
                 <li><object type="text/sitemap"><param name="Name" value="cAnalysisResults Interface"></object>
                   <ul>
                     <li><object type="text/sitemap"><param name="Name" value="BaseReact Method"><param name="Local" value="html/base_react.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="AssembledJointMass Method"><param name="Local" value="html/assembled_joint_mass.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="AssembledJointMass_1 Method"><param name="Local" value="html/assembled_joint_mass_1.htm"></object></li>
                     <li><object type="text/sitemap"><param name="Name" value="FrameForce Method"><param name="Local" value="html/frame_force.htm"></object></li>
                   </ul>
                 </li>
@@ -132,6 +169,24 @@ fn write_fixture_corpus(source: &Path) {
         ),
     )
     .expect("write frame force page");
+    fs::write(
+        source.join("html/assembled_joint_mass.htm"),
+        api_page(
+            "AssembledJointMass",
+            "int AssembledJointMass(ref int NumberResults)",
+            "Assembled joint mass results.",
+        ),
+    )
+    .expect("write assembled joint mass page");
+    fs::write(
+        source.join("html/assembled_joint_mass_1.htm"),
+        api_page(
+            "AssembledJointMass",
+            "int AssembledJointMass(string Name, ref int NumberResults)",
+            "Assembled joint mass results for a named object.",
+        ),
+    )
+    .expect("write assembled joint mass overload page");
     fs::write(
         source.join("html/base_react.htm"),
         api_page(

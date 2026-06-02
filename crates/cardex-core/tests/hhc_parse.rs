@@ -80,3 +80,51 @@ fn parse_hhc_recovers_fully_qualified_method_symbols() {
 
     assert_eq!(run_analysis.symbol.as_deref(), Some("cAnalyze.RunAnalysis"));
 }
+
+#[test]
+fn parse_hhc_gives_overloads_unique_symbols_and_shared_family() {
+    let hhc = r#"
+    <html><body><ul>
+      <li><object type="text/sitemap">
+        <param name="Name" value="CSI API ETABS v1">
+        <param name="Local" value="index.htm"></object>
+        <ul>
+          <li><object type="text/sitemap">
+            <param name="Name" value="cAnalysisResults Interface"></object>
+            <ul>
+              <li><object type="text/sitemap">
+                <param name="Name" value="AssembledJointMass Method">
+                <param name="Local" value="html/ajm.htm"></object></li>
+              <li><object type="text/sitemap">
+                <param name="Name" value="AssembledJointMass_1 Method">
+                <param name="Local" value="html/ajm1.htm"></object></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul></body></html>
+    "#;
+    let toc = parse_hhc(hhc).expect("hhc parses");
+    let base = toc
+        .entries
+        .iter()
+        .find(|entry| entry.local.as_deref() == Some("html/ajm.htm"))
+        .expect("base overload exists");
+    let overload = toc
+        .entries
+        .iter()
+        .find(|entry| entry.local.as_deref() == Some("html/ajm1.htm"))
+        .expect("suffix overload exists");
+
+    assert_eq!(
+        base.symbol.as_deref(),
+        Some("cAnalysisResults.AssembledJointMass")
+    );
+    assert_eq!(
+        overload.symbol.as_deref(),
+        Some("cAnalysisResults.AssembledJointMass_1")
+    );
+    assert_eq!(base.overload_of.as_deref(), Some("AssembledJointMass"));
+    assert_eq!(overload.overload_of.as_deref(), Some("AssembledJointMass"));
+    assert_ne!(base.symbol, overload.symbol);
+}

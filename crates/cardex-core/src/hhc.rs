@@ -39,7 +39,7 @@ pub fn parse_hhc(input: &str) -> Result<Toc> {
         let base = title_base(&title);
         let interface = infer_interface(&kind, &base, &ancestors);
         let overload_of = match kind {
-            PageKind::Method | PageKind::Property => Some(base.clone()),
+            PageKind::Method | PageKind::Property => Some(canonical_base(&base)),
             _ => None,
         };
         let symbol = infer_symbol(&kind, &base, interface.as_deref());
@@ -104,7 +104,6 @@ pub(crate) fn title_base(title: &str) -> String {
     value
 }
 
-#[allow(dead_code)] // Wired into overload grouping in the next hardening work order.
 pub(crate) fn canonical_base(base: &str) -> String {
     if let Some(idx) = base.rfind('_') {
         let suffix = &base[idx + 1..];

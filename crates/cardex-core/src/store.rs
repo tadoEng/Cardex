@@ -91,6 +91,30 @@ impl CardStore {
             .unwrap_or_default())
     }
 
+    /// All cards whose canonical family equals the canonical family of `key`.
+    pub fn overloads(&self, key: &str) -> Result<Vec<String>> {
+        let Some(target) = self.get(key)? else {
+            return Ok(Vec::new());
+        };
+        let Some(family) = target.overload_of else {
+            return Ok(Vec::new());
+        };
+        let interface = target.interface;
+
+        let mut out: Vec<String> = self
+            .cards
+            .iter()
+            .filter(|card| {
+                card.overload_of.as_ref() == Some(&family)
+                    && card.interface.as_ref() == interface.as_ref()
+            })
+            .filter_map(|card| card.symbol.clone())
+            .collect();
+        out.sort();
+        out.dedup();
+        Ok(out)
+    }
+
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
         search_cards(&self.root, query, limit, &self.by_page_id, &self.cards)
     }
