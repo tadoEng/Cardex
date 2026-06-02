@@ -77,18 +77,16 @@ impl CardStore {
             .unwrap_or_default())
     }
 
-    pub fn related(&self, key: &str) -> Result<Vec<String>> {
-        let graph_key = self
-            .get(key)?
-            .and_then(|card| card.symbol)
-            .unwrap_or_else(|| key.to_string());
+    pub fn related(&self, symbol: &str) -> Result<Vec<String>> {
+        if let Some(list) = self.graph.related.get(symbol) {
+            return Ok(list.clone());
+        }
 
-        Ok(self
-            .graph
-            .related
-            .get(&graph_key)
-            .cloned()
-            .unwrap_or_default())
+        if let Some(card) = self.get(symbol)? {
+            return Ok(card.related);
+        }
+
+        Ok(Vec::new())
     }
 
     /// All cards whose canonical family equals the canonical family of `key`.

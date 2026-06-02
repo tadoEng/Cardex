@@ -72,20 +72,6 @@ fn cli_build_search_get_and_members_support_json_output() {
         ])
     );
 
-    let related = run_cardex([
-        "related",
-        "cAnalysisResults.FrameForce",
-        "--index",
-        index.to_str().expect("utf-8 index"),
-        "--json",
-    ]);
-    assert_success(&related);
-    let related_json: Value = serde_json::from_slice(&related.stdout).expect("related json");
-    assert_eq!(
-        related_json,
-        serde_json::json!(["cAnalysisResultsSetup.SetCaseSelectedForOutput"])
-    );
-
     let get_base = run_cardex([
         "get",
         "cAnalysisResults.AssembledJointMass",
@@ -115,6 +101,20 @@ fn cli_build_search_get_and_members_support_json_output() {
         "cAnalysisResults.AssembledJointMass_1"
     );
     assert_ne!(get_base_json["page_id"], get_overload_json["page_id"]);
+
+    let related = run_cardex([
+        "related",
+        "cAnalysisResults.FrameForce",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+        "--json",
+    ]);
+    assert_success(&related);
+    let related_json: Value = serde_json::from_slice(&related.stdout).expect("related json");
+    assert_eq!(
+        related_json,
+        serde_json::json!(["cAnalysisResults.BaseReact"])
+    );
 }
 
 fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
@@ -162,10 +162,11 @@ fn write_fixture_corpus(source: &Path) {
 
     fs::write(
         source.join("html/frame_force.htm"),
-        api_page(
+        api_page_with_related(
             "FrameForce",
             "int FrameForce(string Name, eItemTypeElm ItemTypeElm, ref int NumberResults)",
             "Frame force results for line elements.",
+            "cAnalysisResults.BaseReact Method",
         ),
     )
     .expect("write frame force page");
@@ -213,6 +214,26 @@ fn api_page(name: &str, signature: &str, remarks: &str) -> String {
           <p>{remarks}</p>
           <h2>See Also</h2>
           <p><a href="set_case.htm">cAnalysisResultsSetup.SetCaseSelectedForOutput Method</a></p>
+        </body></html>
+        "#
+    )
+}
+
+fn api_page_with_related(name: &str, signature: &str, remarks: &str, related: &str) -> String {
+    format!(
+        r#"
+        <html><body>
+          <h1>{name} Method</h1>
+          <pre>{signature}</pre>
+          <table>
+            <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+            <tr><td>Name</td><td>string</td><td>Object or case name.</td></tr>
+          </table>
+          <p>Returns zero if successful; otherwise it returns a nonzero value.</p>
+          <h2>Remarks</h2>
+          <p>{remarks}</p>
+          <h2>See Also</h2>
+          <p><a href="base_react.htm">{related}</a></p>
         </body></html>
         "#
     )
