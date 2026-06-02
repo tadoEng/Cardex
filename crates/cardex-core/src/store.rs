@@ -77,18 +77,40 @@ impl CardStore {
             .unwrap_or_default())
     }
 
-    pub fn related(&self, key: &str) -> Result<Vec<String>> {
-        let graph_key = self
-            .get(key)?
-            .and_then(|card| card.symbol)
-            .unwrap_or_else(|| key.to_string());
+    pub fn related(&self, symbol: &str) -> Result<Vec<String>> {
+        if let Some(list) = self.graph.related.get(symbol) {
+            return Ok(list.clone());
+        }
 
-        Ok(self
-            .graph
-            .related
-            .get(&graph_key)
-            .cloned()
-            .unwrap_or_default())
+        if let Some(card) = self.get(symbol)? {
+            return Ok(card.related);
+        }
+
+        Ok(Vec::new())
+    }
+
+    /// All cards whose canonical family equals the canonical family of `key`.
+    pub fn overloads(&self, key: &str) -> Result<Vec<String>> {
+        let Some(target) = self.get(key)? else {
+            return Ok(Vec::new());
+        };
+        let Some(family) = target.overload_of else {
+            return Ok(Vec::new());
+        };
+        let interface = target.interface;
+
+        let mut out: Vec<String> = self
+            .cards
+            .iter()
+            .filter(|card| {
+                card.overload_of.as_ref() == Some(&family)
+                    && card.interface.as_ref() == interface.as_ref()
+            })
+            .filter_map(|card| card.symbol.clone())
+            .collect();
+        out.sort();
+        out.dedup();
+        Ok(out)
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {

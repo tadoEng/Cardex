@@ -19,7 +19,7 @@ enum Command {
     Build {
         #[arg(long)]
         source: PathBuf,
-        #[arg(long)]
+        #[arg(long, default_value = ".cardex/etabs-api")]
         out: PathBuf,
         #[arg(long, default_value = "etabs-api")]
         corpus: String,

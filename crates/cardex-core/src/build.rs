@@ -46,7 +46,7 @@ pub fn build_corpus(options: BuildOptions) -> Result<BuildReport> {
         &options.out_dir.join("manifest.json"),
         &Manifest {
             corpus: options.corpus.clone(),
-            schema_version: 1,
+            schema_version: 2,
             pages: cards.len(),
             generated_by: "cardex-core".to_string(),
         },
