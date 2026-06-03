@@ -10,6 +10,12 @@ use tantivy::{Document, Index, TantivyDocument, doc};
 
 use crate::model::{ApiCard, CardexError, Result, SearchHit};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum QueryMode {
+    Strict,
+    Relaxed,
+}
+
 struct SearchFields {
     page_id: Field,
     symbol: Field,
@@ -54,6 +60,7 @@ pub(crate) fn search_cards(
     limit: usize,
     by_page_id: &HashMap<String, usize>,
     cards: &[ApiCard],
+    mode: QueryMode,
 ) -> Result<Vec<SearchHit>> {
     let index_dir = root.join("tantivy");
     if !index_dir.exists() {
@@ -78,7 +85,9 @@ pub(crate) fn search_cards(
             fields.text,
         ],
     );
-    query_parser.set_conjunction_by_default();
+    if matches!(mode, QueryMode::Strict) {
+        query_parser.set_conjunction_by_default();
+    }
     query_parser.set_field_boost(fields.identifier, 8.0);
     query_parser.set_field_boost(fields.symbol, 5.0);
     query_parser.set_field_boost(fields.title, 3.0);

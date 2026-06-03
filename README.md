@@ -32,12 +32,22 @@ crates/
   cardex-cli/    # clap CLI wrapper around cardex-core
 docs/
   README.md
+skills/
+  cardex-etabs-api/              # pure Cardex + ETABS API retrieval policy
+  etabsharp-cardex-development/  # use Cardex API cards while developing EtabSharp
   superpowers/
     build-report-etabs-api.md
     plans/       # implementation notes and task tracking
 ```
 
 For more detail, see [BUILD_REPORT.md](BUILD_REPORT.md) and [docs/superpowers/build-report-etabs-api.md](docs/superpowers/build-report-etabs-api.md).
+
+## Agent Skills
+
+Repo-local skills are available under skills/:
+
+- cardex-etabs-api: pure Cardex + CSI ETABS API retrieval policy for searching, fetching compact API cards, respecting design-code versions, and checking CSI return codes.
+- etabsharp-cardex-development: wrapper-development policy that uses Cardex API cards as source material when designing or modifying EtabSharp.
 
 ## Build And Test
 
@@ -98,3 +108,4 @@ cargo run -p cardex-cli -- related "cAnalysisResults.FrameForce" --index ".carde
 - L3: use raw/full page text only when the compact card is ambiguous.
 
 Agents should search Cardex first, fetch only the target API card, check CSI return codes, and avoid mutating live ETABS models unless explicitly requested.
+

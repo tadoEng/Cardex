@@ -33,6 +33,8 @@ enum Command {
         #[arg(long, default_value_t = 8)]
         limit: usize,
         #[arg(long)]
+        explain: bool,
+        #[arg(long)]
         json: bool,
     },
     Get {
@@ -89,9 +91,44 @@ fn main() -> anyhow::Result<()> {
             query,
             index,
             limit,
+            explain,
             json,
         } => {
             let store = CardStore::open(&index).context("failed to open Cardex index")?;
+            if explain {
+                let explained = store
+                    .search_explained(&query, limit)
+                    .context("search failed")?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&explained)?);
+                } else {
+                    println!("query: {}", explained.original_query);
+                    println!("stage: {}", explained.stage);
+                    if let Some(scope) = explained.version_scope.as_deref() {
+                        println!("version_scope: {scope}");
+                    }
+                    println!("expanded: {}", explained.expanded_query);
+                    if !explained.promotions.is_empty() {
+                        println!("promotions:");
+                        for promotion in &explained.promotions {
+                            println!(
+                                "  {}\t{}\t{}",
+                                promotion.symbol, promotion.seed_symbol, promotion.reason
+                            );
+                        }
+                    }
+                    for hit in explained.hits {
+                        println!(
+                            "{:.3}\t{}\t{}",
+                            hit.score,
+                            hit.symbol.as_deref().unwrap_or(&hit.page_id),
+                            hit.summary.as_deref().unwrap_or(&hit.title)
+                        );
+                    }
+                }
+                return Ok(());
+            }
+
             let hits = store.search(&query, limit).context("search failed")?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&hits)?);

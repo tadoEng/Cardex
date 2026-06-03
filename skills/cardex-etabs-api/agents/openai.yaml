@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cardex ETABS API"
+  short_description: "Retrieve ETABS API cards before coding"
+  default_prompt: "Use $cardex-etabs-api to answer an ETABS API question safely."
+
+policy:
+  allow_implicit_invocation: true

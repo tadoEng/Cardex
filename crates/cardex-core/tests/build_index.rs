@@ -26,7 +26,7 @@ fn build_corpus_writes_cards_docgraph_and_search_index() {
         &fs::read_to_string(out.join("manifest.json")).expect("manifest reads"),
     )
     .expect("manifest json");
-    assert_eq!(manifest["schema_version"], 2);
+    assert_eq!(manifest["schema_version"], 3);
 
     let store = CardStore::open(&out).expect("store opens");
     let hits = store.search("frame force", 5).expect("search succeeds");
@@ -124,6 +124,124 @@ fn search_prefers_camel_case_symbol_match_over_body_noise() {
     );
 }
 
+#[test]
+fn search_promotes_docgraph_members_with_explicit_aci_version_scope() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    let out = temp.path().join("index");
+    write_aci_fixture_corpus(&source);
+
+    build_corpus(BuildOptions {
+        source_dir: source,
+        out_dir: out.clone(),
+        corpus: "etabs-api".to_string(),
+    })
+    .expect("corpus builds");
+
+    let graph_json: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.join("docgraph.json")).expect("graph reads"))
+            .expect("graph json");
+    assert_eq!(
+        graph_json["returns_interface"]["cDesignConcrete.ACI318_14"],
+        "cDCoACI318_14"
+    );
+
+    let store = CardStore::open(&out).expect("store opens");
+    let hits = store
+        .search("ACI 318-14 concrete frame design requirement", 8)
+        .expect("search succeeds");
+    let symbols = hit_symbols(&hits);
+
+    assert!(
+        symbols
+            .iter()
+            .any(|symbol| symbol == "cDCoACI318_14.GetPreference"),
+        "expected GetPreference in {symbols:?}"
+    );
+    assert!(
+        symbols
+            .iter()
+            .any(|symbol| symbol == "cDCoACI318_14.SetPreference"),
+        "expected SetPreference in {symbols:?}"
+    );
+    assert!(
+        !symbols.iter().any(|symbol| symbol.contains("ACI318_19")),
+        "explicit ACI318_14 query leaked another ACI version: {symbols:?}"
+    );
+
+    let explained = store
+        .search_explained("ACI 318-14 concrete frame design requirement", 8)
+        .expect("explained search succeeds");
+    assert_eq!(explained.version_scope.as_deref(), Some("ACI318_14"));
+    assert!(
+        explained
+            .promotions
+            .iter()
+            .any(|promotion| promotion.symbol == "cDCoACI318_14.GetPreference"),
+        "expected graph promotion in {:?}",
+        explained.promotions
+    );
+}
+
+#[test]
+fn bare_aci318_query_keeps_all_available_versions_in_scope() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    let out = temp.path().join("index");
+    write_aci_fixture_corpus(&source);
+
+    build_corpus(BuildOptions {
+        source_dir: source,
+        out_dir: out.clone(),
+        corpus: "etabs-api".to_string(),
+    })
+    .expect("corpus builds");
+
+    let store = CardStore::open(&out).expect("store opens");
+    let explained = store
+        .search_explained("ACI 318 concrete frame design", 12)
+        .expect("explained search succeeds");
+    let symbols = hit_symbols(&explained.hits);
+
+    assert_eq!(
+        explained.version_scope.as_deref(),
+        Some("all_aci318_versions")
+    );
+    assert!(
+        symbols.iter().any(|symbol| symbol.contains("ACI318_14")),
+        "expected ACI318_14 in {symbols:?}"
+    );
+    assert!(
+        symbols.iter().any(|symbol| symbol.contains("ACI318_19")),
+        "expected ACI318_19 in {symbols:?}"
+    );
+}
+
+#[test]
+fn section_definition_question_finds_frame_property_type_enum() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    let out = temp.path().join("index");
+    write_section_fixture_corpus(&source);
+
+    build_corpus(BuildOptions {
+        source_dir: source,
+        out_dir: out.clone(),
+        corpus: "etabs-api".to_string(),
+    })
+    .expect("corpus builds");
+
+    let store = CardStore::open(&out).expect("store opens");
+    let hits = store
+        .search("how many section does etabs api support to define", 5)
+        .expect("search succeeds");
+
+    assert_eq!(
+        hits.first().and_then(|hit| hit.symbol.as_deref()),
+        Some("eFramePropType")
+    );
+}
+
 fn write_fixture_corpus(source: &Path) {
     fs::create_dir_all(source.join("html")).expect("create fixture dirs");
     fs::write(
@@ -179,6 +297,188 @@ fn write_fixture_corpus(source: &Path) {
         ),
     )
     .expect("write setup page");
+}
+
+fn write_section_fixture_corpus(source: &Path) {
+    fs::create_dir_all(source.join("html")).expect("create fixture dirs");
+    fs::write(
+        source.join("CSI API ETABS v1.hhc"),
+        r#"
+        <html><body>
+          <ul>
+            <li><object type="text/sitemap"><param name="Name" value="CSI API ETABS v1"></object>
+              <ul>
+                <li><object type="text/sitemap"><param name="Name" value="eFramePropType Enumeration"><param name="Local" value="html/e_frame_prop_type.htm"></object></li>
+                <li><object type="text/sitemap"><param name="Name" value="cPropFrame Interface"></object>
+                  <ul>
+                    <li><object type="text/sitemap"><param name="Name" value="SetRectangle Method"><param name="Local" value="html/set_rectangle.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="SetCircle Method"><param name="Local" value="html/set_circle.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="Count Method"><param name="Local" value="html/count.htm"></object></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </body></html>
+        "#,
+    )
+    .expect("write hhc");
+
+    fs::write(
+        source.join("html/e_frame_prop_type.htm"),
+        r#"
+        <html><body>
+          <h1>eFramePropType Enumeration</h1>
+          <table>
+            <tr><th>Member name</th><th>Value</th></tr>
+            <tr><td>I</td><td>1</td></tr>
+            <tr><td>Channel</td><td>2</td></tr>
+            <tr><td>Rectangular</td><td>8</td></tr>
+          </table>
+          <p>The possible frame section property types.</p>
+        </body></html>
+        "#,
+    )
+    .expect("write enum page");
+    fs::write(
+        source.join("html/set_rectangle.htm"),
+        api_page(
+            "SetRectangle",
+            "int SetRectangle(string Name, string MatProp, double T3, double T2)",
+            "Initializes a rectangular frame section property.",
+        ),
+    )
+    .expect("write set rectangle");
+    fs::write(
+        source.join("html/set_circle.htm"),
+        api_page(
+            "SetCircle",
+            "int SetCircle(string Name, string MatProp, double T3)",
+            "Initializes a circular frame section property.",
+        ),
+    )
+    .expect("write set circle");
+    fs::write(
+        source.join("html/count.htm"),
+        api_page(
+            "Count",
+            "int Count()",
+            "Returns the total number of defined frame section properties in the model.",
+        ),
+    )
+    .expect("write count");
+}
+
+fn write_aci_fixture_corpus(source: &Path) {
+    fs::create_dir_all(source.join("html")).expect("create fixture dirs");
+    fs::write(
+        source.join("CSI API ETABS v1.hhc"),
+        r#"
+        <html><body>
+          <ul>
+            <li><object type="text/sitemap"><param name="Name" value="CSI API ETABS v1"></object>
+              <ul>
+                <li><object type="text/sitemap"><param name="Name" value="cDesignConcrete Interface"></object>
+                  <ul>
+                    <li><object type="text/sitemap"><param name="Name" value="ACI318_14 Property"><param name="Local" value="html/aci318_14_property.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="ACI318_19 Property"><param name="Local" value="html/aci318_19_property.htm"></object></li>
+                  </ul>
+                </li>
+                <li><object type="text/sitemap"><param name="Name" value="cDCoACI318_14 Interface"></object>
+                  <ul>
+                    <li><object type="text/sitemap"><param name="Name" value="GetPreference Method"><param name="Local" value="html/get_preference_14.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="SetPreference Method"><param name="Local" value="html/set_preference_14.htm"></object></li>
+                    <li><object type="text/sitemap"><param name="Name" value="GetOverwrite Method"><param name="Local" value="html/get_overwrite_14.htm"></object></li>
+                  </ul>
+                </li>
+                <li><object type="text/sitemap"><param name="Name" value="cDCoACI318_19 Interface"></object>
+                  <ul>
+                    <li><object type="text/sitemap"><param name="Name" value="GetPreference Method"><param name="Local" value="html/get_preference_19.htm"></object></li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </body></html>
+        "#,
+    )
+    .expect("write hhc");
+
+    fs::write(
+        source.join("html/aci318_14_property.htm"),
+        property_page(
+            "ACI318_14",
+            "cDCoACI318_14 ACI318_14 { get ; }",
+            "ReadOnly Property ACI318_14 As cDCoACI318_14",
+        ),
+    )
+    .expect("write ACI318_14 property");
+    fs::write(
+        source.join("html/aci318_19_property.htm"),
+        property_page(
+            "ACI318_19",
+            "cDCoACI318_19 ACI318_19 { get ; }",
+            "ReadOnly Property ACI318_19 As cDCoACI318_19",
+        ),
+    )
+    .expect("write ACI318_19 property");
+    fs::write(
+        source.join("html/get_preference_14.htm"),
+        api_page(
+            "GetPreference",
+            "int GetPreference(int Item, ref double Value)",
+            "Retrieves the value of a concrete design preference item.",
+        ),
+    )
+    .expect("write GetPreference 14");
+    fs::write(
+        source.join("html/set_preference_14.htm"),
+        api_page(
+            "SetPreference",
+            "int SetPreference(int Item, double Value)",
+            "Sets the value of a concrete design preference item.",
+        ),
+    )
+    .expect("write SetPreference 14");
+    fs::write(
+        source.join("html/get_overwrite_14.htm"),
+        api_page(
+            "GetOverwrite",
+            "int GetOverwrite(string Name, int Item, ref double Value, ref bool ProgDet)",
+            "Retrieves the value of a concrete frame design overwrite item.",
+        ),
+    )
+    .expect("write GetOverwrite 14");
+    fs::write(
+        source.join("html/get_preference_19.htm"),
+        api_page(
+            "GetPreference",
+            "int GetPreference(int Item, ref double Value)",
+            "Retrieves the value of an ACI 318-19 concrete design preference item.",
+        ),
+    )
+    .expect("write GetPreference 19");
+}
+
+fn property_page(name: &str, signature_cs: &str, signature_vb: &str) -> String {
+    format!(
+        r#"
+        <html><body>
+          <h1>{name} Property</h1>
+          <pre>{signature_cs}</pre>
+          <pre>{signature_vb}</pre>
+          <p>Concrete frame design code property.</p>
+          <h2>See Also</h2>
+          <p><a href="design_concrete.htm">cDesignConcrete Interface</a></p>
+        </body></html>
+        "#
+    )
+}
+
+fn hit_symbols(hits: &[cardex_core::SearchHit]) -> Vec<String> {
+    hits.iter()
+        .filter_map(|hit| hit.symbol.clone())
+        .collect::<Vec<_>>()
 }
 
 fn api_page(name: &str, signature: &str, remarks: &str) -> String {

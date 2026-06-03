@@ -118,6 +118,8 @@ pub struct DocGraph {
     pub members: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     pub related: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    pub returns_interface: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -132,4 +134,25 @@ pub struct SearchHit {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     pub score: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SearchExplanation {
+    pub original_query: String,
+    pub expanded_query: String,
+    pub normalized_terms: Vec<String>,
+    pub expanded_terms: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_scope: Option<String>,
+    pub stage: String,
+    pub seed_symbols: Vec<String>,
+    pub promotions: Vec<SearchPromotion>,
+    pub hits: Vec<SearchHit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchPromotion {
+    pub symbol: String,
+    pub seed_symbol: String,
+    pub reason: String,
 }

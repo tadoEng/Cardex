@@ -1,0 +1,7 @@
+interface:
+  display_name: "EtabSharp Cardex Development"
+  short_description: "Develop EtabSharp using Cardex API cards"
+  default_prompt: "Use $etabsharp-cardex-development to design an EtabSharp wrapper method from ETABS API docs."
+
+policy:
+  allow_implicit_invocation: true

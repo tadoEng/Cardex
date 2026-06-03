@@ -143,6 +143,20 @@ fn cli_build_then_query_with_default_index_paths() {
     assert_success(&search);
     let search_json: Value = serde_json::from_slice(&search.stdout).expect("search json");
     assert_eq!(search_json[0]["symbol"], "cAnalysisResults.FrameForce");
+
+    let explained = Command::new(env!("CARGO_BIN_EXE_cardex"))
+        .current_dir(temp.path())
+        .args(["search", "frame force", "--explain", "--json"])
+        .output()
+        .expect("explained search command runs");
+    assert_success(&explained);
+    let explained_json: Value =
+        serde_json::from_slice(&explained.stdout).expect("explained search json");
+    assert_eq!(explained_json["original_query"], "frame force");
+    assert_eq!(
+        explained_json["hits"][0]["symbol"],
+        "cAnalysisResults.FrameForce"
+    );
 }
 
 fn run_cardex<const N: usize>(args: [&str; N]) -> std::process::Output {
