@@ -1,7 +1,9 @@
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 
 use crate::hhc::normalize_space;
-use crate::model::{ApiCard, CardexError, Parameter, Result, TocEntry};
+use crate::model::{
+    ApiCard, ApiExample, CardexError, ExampleLanguage, Parameter, Result, TocEntry,
+};
 
 pub fn build_card_from_html(entry: &TocEntry, html: &str) -> Result<ApiCard> {
     let document = Html::parse_document(html);
@@ -17,6 +19,7 @@ pub fn build_card_from_html(entry: &TocEntry, html: &str) -> Result<ApiCard> {
     });
     let remarks = extract_named_section(&raw_text, "Remarks", &["See Also", "Example", "Examples"]);
     let related = extract_related(&document)?;
+    let examples = extract_examples(&document)?;
     let method_name = entry
         .overload_of
         .as_deref()
@@ -49,9 +52,139 @@ pub fn build_card_from_html(entry: &TocEntry, html: &str) -> Result<ApiCard> {
         returns,
         remarks,
         related,
+        examples,
         summary,
         raw_text,
+        content_sha256: String::new(),
     })
+}
+
+fn extract_examples(document: &Html) -> Result<Vec<ApiExample>> {
+    let section_selector = selector(
+        "h1, h2, h3, h4, h5, h6, .collapsibleRegionTitle, .language, .codeSnippetContainer, pre, code",
+    )?;
+    let mut in_examples = false;
+    let mut language = ExampleLanguage::Unknown;
+    let mut examples = Vec::new();
+
+    for element in document.select(&section_selector) {
+        let tag = element.value().name();
+        let text = normalize_space(&element.text().collect::<Vec<_>>().join(" "));
+        if text.is_empty() {
+            continue;
+        }
+
+        if has_class(&element, "codeSnippetContainer") {
+            if in_examples {
+                for example in extract_tabbed_examples(&element)? {
+                    if !examples
+                        .iter()
+                        .any(|existing: &ApiExample| existing.code == example.code)
+                    {
+                        examples.push(example);
+                    }
+                }
+            }
+            continue;
+        }
+
+        if tag == "pre" || tag == "code" {
+            if in_examples
+                && !examples
+                    .iter()
+                    .any(|example: &ApiExample| example.code == text)
+            {
+                examples.push(ApiExample {
+                    language: infer_example_language(&text, &language),
+                    code: text,
+                });
+            }
+            continue;
+        }
+
+        if is_examples_heading(&text) {
+            in_examples = true;
+            language = ExampleLanguage::Unknown;
+        } else if in_examples {
+            if let Some(example_language) = parse_example_language(&text) {
+                language = example_language;
+            } else if is_section_heading(tag, element.value().attr("class")) {
+                in_examples = false;
+            }
+        }
+    }
+
+    Ok(examples)
+}
+
+fn extract_tabbed_examples(container: &ElementRef<'_>) -> Result<Vec<ApiExample>> {
+    let tab_selector = selector(".codeSnippetContainerTab a, .codeSnippetContainerTabSingle a")?;
+    let code_selector = selector(".codeSnippetContainerCode")?;
+    let languages = container
+        .select(&tab_selector)
+        .map(|tab| normalize_space(&tab.text().collect::<Vec<_>>().join(" ")))
+        .map(|label| parse_example_language(&label))
+        .collect::<Vec<_>>();
+    let codes = container
+        .select(&code_selector)
+        .map(|code| normalize_space(&code.text().collect::<Vec<_>>().join(" ")))
+        .filter(|code| !code.is_empty())
+        .collect::<Vec<_>>();
+
+    Ok(languages
+        .into_iter()
+        .zip(codes)
+        .filter_map(|(language, code)| language.map(|language| ApiExample { language, code }))
+        .collect())
+}
+
+fn has_class(element: &ElementRef<'_>, expected: &str) -> bool {
+    element
+        .value()
+        .attr("class")
+        .is_some_and(|value| value.split_whitespace().any(|class| class == expected))
+}
+
+fn is_examples_heading(text: &str) -> bool {
+    text.eq_ignore_ascii_case("example") || text.eq_ignore_ascii_case("examples")
+}
+
+fn parse_example_language(text: &str) -> Option<ExampleLanguage> {
+    let normalized = text.to_ascii_lowercase().replace([' ', '-', '.'], "");
+    match normalized.as_str() {
+        "c#" | "csharp" => Some(ExampleLanguage::CSharp),
+        "vb" | "vbnet" | "visualbasic" | "visualbasicnet" => Some(ExampleLanguage::VisualBasic),
+        _ => None,
+    }
+}
+
+fn infer_example_language(code: &str, current: &ExampleLanguage) -> ExampleLanguage {
+    if current != &ExampleLanguage::Unknown {
+        return current.clone();
+    }
+    if code.trim_start().starts_with("Function ")
+        || code.trim_start().starts_with("Sub ")
+        || code.contains(" As ")
+    {
+        ExampleLanguage::VisualBasic
+    } else if code.contains(';')
+        || code.contains("using ")
+        || code.contains("public ")
+        || code.contains("private ")
+    {
+        ExampleLanguage::CSharp
+    } else {
+        ExampleLanguage::Unknown
+    }
+}
+
+fn is_section_heading(tag: &str, class: Option<&str>) -> bool {
+    matches!(tag, "h1" | "h2" | "h3" | "h4" | "h5" | "h6")
+        || class.is_some_and(|value| {
+            value
+                .split_whitespace()
+                .any(|name| name == "collapsibleRegionTitle")
+        })
 }
 
 fn extract_return_value(raw_text: &str) -> Option<String> {

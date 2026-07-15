@@ -18,7 +18,10 @@ fn real_corpus_has_no_corrupted_or_collided_symbols() {
     build_corpus(BuildOptions {
         source_dir: src,
         out_dir: out.clone(),
-        corpus: "etabs-api".into(),
+        corpus: "etabs-api-23.3".into(),
+        product_name: "ETABS".into(),
+        source_docs_version: "23.3".into(),
+        source_docs_build: "test".into(),
     })
     .expect("real corpus builds");
     let store = CardStore::open(&out).expect("store opens");

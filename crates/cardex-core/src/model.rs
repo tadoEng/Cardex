@@ -62,6 +62,20 @@ pub struct Parameter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExampleLanguage {
+    CSharp,
+    VisualBasic,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiExample {
+    pub language: ExampleLanguage,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiCard {
     pub page_id: String,
     pub title: String,
@@ -84,9 +98,12 @@ pub struct ApiCard {
     pub remarks: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub related: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<ApiExample>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     pub raw_text: String,
+    pub content_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +111,9 @@ pub struct BuildOptions {
     pub source_dir: PathBuf,
     pub out_dir: PathBuf,
     pub corpus: String,
+    pub product_name: String,
+    pub source_docs_version: String,
+    pub source_docs_build: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +122,8 @@ pub struct BuildReport {
     pub pages: usize,
     pub hhc_entries: usize,
     pub output_dir: PathBuf,
+    pub source_dir_sha256: String,
+    pub corpus_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,6 +132,27 @@ pub struct Manifest {
     pub schema_version: u32,
     pub pages: usize,
     pub generated_by: String,
+    pub product_name: String,
+    pub source_docs_version: String,
+    pub source_docs_build: String,
+    pub source_dir_sha256: String,
+    pub corpus_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CardEvidence {
+    pub card: ApiCard,
+    pub card_sha256: String,
+    pub corpus_sha256: String,
+    pub manifest: Manifest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RawTextEvidence {
+    pub page_id: String,
+    pub card_sha256: String,
+    pub text: String,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

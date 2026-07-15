@@ -18,12 +18,19 @@ fn cli_build_search_get_and_members_support_json_output() {
         "--out",
         index.to_str().expect("utf-8 index"),
         "--corpus",
-        "etabs-api",
+        "etabs-api-23.3",
+        "--product-name",
+        "ETABS",
+        "--source-docs-version",
+        "23.3",
+        "--source-docs-build",
+        "synthetic",
         "--json",
     ]);
     assert_success(&build);
     let build_json: Value = serde_json::from_slice(&build.stdout).expect("build json");
     assert_eq!(build_json["pages"], 4);
+    assert_eq!(build_json["corpus"], "etabs-api-23.3");
 
     let search = run_cardex([
         "search",
@@ -51,6 +58,28 @@ fn cli_build_search_get_and_members_support_json_output() {
     assert_eq!(
         get_json["returns"],
         "Returns zero if successful; otherwise it returns a nonzero value."
+    );
+
+    let evidence = run_cardex([
+        "evidence",
+        "cAnalysisResults.FrameForce",
+        "--index",
+        index.to_str().expect("utf-8 index"),
+    ]);
+    assert_success(&evidence);
+    let evidence_json: Value = serde_json::from_slice(&evidence.stdout).expect("evidence json");
+    assert_eq!(
+        evidence_json["card"]["symbol"],
+        "cAnalysisResults.FrameForce"
+    );
+    assert_eq!(evidence_json["manifest"]["schema_version"], 4);
+    assert_eq!(
+        evidence_json["card_sha256"],
+        evidence_json["card"]["content_sha256"]
+    );
+    assert_eq!(
+        evidence_json["corpus_sha256"],
+        evidence_json["manifest"]["corpus_sha256"]
     );
 
     let members = run_cardex([
@@ -129,6 +158,14 @@ fn cli_build_then_query_with_default_index_paths() {
             "build",
             "--source",
             source.to_str().expect("utf-8 source"),
+            "--corpus",
+            "etabs-api-test",
+            "--product-name",
+            "ETABS",
+            "--source-docs-version",
+            "test",
+            "--source-docs-build",
+            "synthetic",
             "--json",
         ])
         .output()

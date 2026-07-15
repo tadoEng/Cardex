@@ -3,6 +3,8 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use sha2::{Digest, Sha256};
+
 use crate::cards::build_card_from_html;
 use crate::hhc::parse_hhc;
 use crate::model::{
@@ -16,6 +18,7 @@ pub fn build_corpus(options: BuildOptions) -> Result<BuildReport> {
         .ok_or_else(|| CardexError::MissingArtifact("no .hhc file found in source dir".into()))?;
     let hhc = fs::read_to_string(&hhc_path)?;
     let toc = parse_hhc(&hhc)?;
+    let source_dir_sha256 = digest_source_directory(&options.source_dir)?;
     let mut cards = Vec::new();
 
     for entry in &toc.entries {
@@ -27,8 +30,12 @@ pub fn build_corpus(options: BuildOptions) -> Result<BuildReport> {
             continue;
         }
         let html = fs::read_to_string(page_path)?;
-        cards.push(build_card_from_html(entry, &html)?);
+        let mut card = build_card_from_html(entry, &html)?;
+        card.content_sha256 = digest_card(&card)?;
+        cards.push(card);
     }
+
+    let corpus_sha256 = digest_corpus(&cards);
 
     let graph = DocGraph {
         members: build_members(&cards),
@@ -50,9 +57,14 @@ pub fn build_corpus(options: BuildOptions) -> Result<BuildReport> {
         &options.out_dir.join("manifest.json"),
         &Manifest {
             corpus: options.corpus.clone(),
-            schema_version: 3,
+            schema_version: 4,
             pages: cards.len(),
             generated_by: "cardex-core".to_string(),
+            product_name: options.product_name,
+            source_docs_version: options.source_docs_version,
+            source_docs_build: options.source_docs_build,
+            source_dir_sha256: source_dir_sha256.clone(),
+            corpus_sha256: corpus_sha256.clone(),
         },
     )?;
     build_search_index(&options.out_dir, &cards)?;
@@ -62,7 +74,76 @@ pub fn build_corpus(options: BuildOptions) -> Result<BuildReport> {
         pages: cards.len(),
         hhc_entries: toc.entries.len(),
         output_dir: options.out_dir,
+        source_dir_sha256,
+        corpus_sha256,
     })
+}
+
+fn digest_card(card: &ApiCard) -> Result<String> {
+    let mut canonical = card.clone();
+    canonical.content_sha256.clear();
+    let bytes = serde_json::to_vec(&canonical)?;
+    Ok(hex_digest(&bytes))
+}
+
+fn digest_corpus(cards: &[ApiCard]) -> String {
+    let mut identities = cards
+        .iter()
+        .map(|card| (card.page_id.as_str(), card.content_sha256.as_str()))
+        .collect::<Vec<_>>();
+    identities.sort_unstable();
+
+    let mut hasher = Sha256::new();
+    for (page_id, digest) in identities {
+        update_length_prefixed(&mut hasher, page_id.as_bytes());
+        update_length_prefixed(&mut hasher, digest.as_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn digest_source_directory(root: &Path) -> Result<String> {
+    let mut files = Vec::new();
+    collect_source_files(root, root, &mut files)?;
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut hasher = Sha256::new();
+    for (relative, path) in files {
+        update_length_prefixed(&mut hasher, relative.as_bytes());
+        update_length_prefixed(&mut hasher, &fs::read(path)?);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn collect_source_files(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<(String, PathBuf)>,
+) -> Result<()> {
+    let mut entries = fs::read_dir(directory)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_source_files(root, &path, files)?;
+        } else if path.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|err| CardexError::Parse(err.to_string()))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            files.push((relative, path));
+        }
+    }
+    Ok(())
+}
+
+fn update_length_prefixed(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 fn build_members(cards: &[ApiCard]) -> BTreeMap<String, Vec<String>> {
@@ -188,8 +269,9 @@ fn find_first_with_extension(root: &Path, extension: &str) -> Result<Option<Path
         return Ok(None);
     }
 
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
+    let mut entries = fs::read_dir(root)?.collect::<std::io::Result<Vec<_>>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
         let path = entry.path();
         if path.is_dir() {
             if let Some(found) = find_first_with_extension(&path, extension)? {

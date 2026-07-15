@@ -298,8 +298,10 @@ mod tests {
             returns: None,
             remarks: None,
             related: Vec::new(),
+            examples: Vec::new(),
             summary: None,
             raw_text: String::new(),
+            content_sha256: String::new(),
         }
     }
 }

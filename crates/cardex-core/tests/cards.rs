@@ -1,4 +1,4 @@
-use cardex_core::{PageKind, TocEntry, build_card_from_html};
+use cardex_core::{ExampleLanguage, PageKind, TocEntry, build_card_from_html};
 
 #[test]
 fn build_card_from_html_extracts_compact_api_fields() {
@@ -137,5 +137,104 @@ fn build_card_from_sandcastle_html_keeps_return_and_related_compact() {
     assert_eq!(
         card.parameters[0].desc.as_deref(),
         Some("Object or group name.")
+    );
+}
+
+#[test]
+fn build_card_extracts_language_tagged_examples_without_changing_raw_text() {
+    let entry = TocEntry {
+        title: "SetWall Method".to_string(),
+        local: Some("html/set_wall.htm".to_string()),
+        depth: 2,
+        ancestors: vec!["cPropArea Interface".to_string()],
+        kind: PageKind::Method,
+        interface: Some("cPropArea".to_string()),
+        symbol: Some("cPropArea.SetWall".to_string()),
+        overload_of: Some("SetWall".to_string()),
+    };
+    let html = r#"
+    <html><body>
+      <h1>SetWall Method</h1>
+      <pre>int SetWall(string Name)</pre>
+      <h2>Examples</h2>
+      <h3>C#</h3>
+      <pre>var result = sapModel.PropArea.SetWall("W1");</pre>
+      <h3>Visual Basic</h3>
+      <pre>Dim result As Integer = SapModel.PropArea.SetWall("W1")</pre>
+      <h2>See Also</h2>
+      <pre>This block is outside the examples section.</pre>
+    </body></html>
+    "#;
+
+    let card = build_card_from_html(&entry, html).expect("card builds");
+
+    assert_eq!(card.examples.len(), 2);
+    assert_eq!(card.examples[0].language, ExampleLanguage::CSharp);
+    assert_eq!(
+        card.examples[0].code,
+        "var result = sapModel.PropArea.SetWall(\"W1\");"
+    );
+    assert_eq!(card.examples[1].language, ExampleLanguage::VisualBasic);
+    assert_eq!(
+        card.examples[1].code,
+        "Dim result As Integer = SapModel.PropArea.SetWall(\"W1\")"
+    );
+    assert!(card.raw_text.contains("Examples C#"));
+    assert!(card.raw_text.contains("Dim result As Integer"));
+    assert!(
+        !card
+            .examples
+            .iter()
+            .any(|example| example.code.contains("outside"))
+    );
+}
+
+#[test]
+fn build_card_extracts_csharp_and_vb_from_sandcastle_tabbed_examples() {
+    let entry = TocEntry {
+        title: "SetWall Method".to_string(),
+        local: Some("html/set_wall.htm".to_string()),
+        depth: 2,
+        ancestors: vec!["cPropArea Interface".to_string()],
+        kind: PageKind::Method,
+        interface: Some("cPropArea".to_string()),
+        symbol: Some("cPropArea.SetWall".to_string()),
+        overload_of: Some("SetWall".to_string()),
+    };
+    let html = r##"
+    <html><body>
+      <h1>SetWall Method</h1>
+      <div class="collapsibleAreaRegion">
+        <span class="collapsibleRegionTitle">Examples</span>
+      </div>
+      <div class="collapsibleSection">
+        <div class="codeSnippetContainer">
+          <div class="codeSnippetContainerTabs">
+            <div class="codeSnippetContainerTab"><a href="#">C#</a></div>
+            <div class="codeSnippetContainerTab"><a href="#">Visual Basic</a></div>
+            <div class="codeSnippetContainerTab"><a href="#">C++</a></div>
+          </div>
+          <div class="codeSnippetContainerCodeContainer">
+            <div class="codeSnippetContainerCode">var result = SetWall("W1");</div>
+            <div class="codeSnippetContainerCode">Dim result As Integer = SetWall("W1")</div>
+            <div class="codeSnippetContainerCode">auto result = SetWall("W1");</div>
+          </div>
+        </div>
+      </div>
+      <div class="collapsibleAreaRegion">
+        <span class="collapsibleRegionTitle">See Also</span>
+      </div>
+    </body></html>
+    "##;
+
+    let card = build_card_from_html(&entry, html).expect("card builds");
+
+    assert_eq!(card.examples.len(), 2);
+    assert_eq!(card.examples[0].language, ExampleLanguage::CSharp);
+    assert_eq!(card.examples[0].code, "var result = SetWall(\"W1\");");
+    assert_eq!(card.examples[1].language, ExampleLanguage::VisualBasic);
+    assert_eq!(
+        card.examples[1].code,
+        "Dim result As Integer = SetWall(\"W1\")"
     );
 }
