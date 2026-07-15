@@ -21,8 +21,14 @@ enum Command {
         source: PathBuf,
         #[arg(long, default_value = ".cardex/etabs-api")]
         out: PathBuf,
-        #[arg(long, default_value = "etabs-api")]
+        #[arg(long)]
         corpus: String,
+        #[arg(long)]
+        product_name: String,
+        #[arg(long)]
+        source_docs_version: String,
+        #[arg(long)]
+        source_docs_build: String,
         #[arg(long)]
         json: bool,
     },
@@ -43,6 +49,11 @@ enum Command {
         index: PathBuf,
         #[arg(long)]
         json: bool,
+    },
+    Evidence {
+        symbol: String,
+        #[arg(long, default_value = ".cardex/etabs-api")]
+        index: PathBuf,
     },
     Members {
         interface: String,
@@ -68,12 +79,18 @@ fn main() -> anyhow::Result<()> {
             source,
             out,
             corpus,
+            product_name,
+            source_docs_version,
+            source_docs_build,
             json,
         } => {
             let report = build_corpus(BuildOptions {
                 source_dir: source,
                 out_dir: out,
                 corpus,
+                product_name,
+                source_docs_version,
+                source_docs_build,
             })
             .context("failed to build Cardex corpus")?;
             if json {
@@ -166,6 +183,13 @@ fn main() -> anyhow::Result<()> {
                     println!("Remarks: {remarks}");
                 }
             }
+        }
+        Command::Evidence { symbol, index } => {
+            let store = CardStore::open(&index).context("failed to open Cardex index")?;
+            let Some(evidence) = store.card_evidence(&symbol).context("evidence failed")? else {
+                bail!("no card found for {symbol}");
+            };
+            println!("{}", serde_json::to_string_pretty(&evidence)?);
         }
         Command::Members {
             interface,

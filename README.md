@@ -17,6 +17,7 @@ The first target corpus is CSI ETABS API documentation extracted from a CHM file
   - `cardex build`
   - `cardex search`
   - `cardex get`
+  - `cardex evidence`
   - `cardex members`
   - `cardex related`
 - Keep generated/proprietary docs and indexes out of Git.
@@ -65,9 +66,19 @@ Use a decompiled CHM folder that contains one `.hhc` file and the linked `.htm` 
 ```powershell
 cargo run -p cardex-cli -- build `
   --source "D:\path\to\decompiled-etabs-api" `
-  --out ".cardex\etabs-api" `
-  --corpus etabs-api `
+  --out ".cardex\etabs-api-23.3" `
+  --corpus etabs-api-23.3 `
+  --product-name ETABS `
+  --source-docs-version 23.3 `
+  --source-docs-build 23.3.0 `
   --json
+```
+
+Retrieve the content-addressed evidence bundle used by downstream automation:
+
+```powershell
+cargo run -p cardex-cli -- evidence cPropArea.SetWall `
+  --index ".cardex\etabs-api-23.3"
 ```
 
 Generated artifacts are ignored by Git.

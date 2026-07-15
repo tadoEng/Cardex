@@ -29,8 +29,11 @@ docs/
 cd c:\Work\Code\Cardex
 cargo run --bin cardex -- build \
   --source "C:\Work\Code\etabApi\CSI_API_ETABS_v1_html" \
-  --out ".cardex" \
-  --corpus etabs-api
+  --out ".cardex/etabs-api-23.3" \
+  --corpus etabs-api-23.3 \
+  --product-name ETABS \
+  --source-docs-version 23.3 \
+  --source-docs-build 23.3.0
 ```
 
 ### Search the Index

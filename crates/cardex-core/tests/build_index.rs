@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use cardex_core::{BuildOptions, CardStore, build_corpus};
+use cardex_core::{BuildOptions, CardStore, Manifest, build_corpus};
 
 #[test]
 fn build_corpus_writes_cards_docgraph_and_search_index() {
@@ -13,7 +13,10 @@ fn build_corpus_writes_cards_docgraph_and_search_index() {
     let report = build_corpus(BuildOptions {
         source_dir: source.clone(),
         out_dir: out.clone(),
-        corpus: "etabs-api".to_string(),
+        corpus: "etabs-api-23.3".to_string(),
+        product_name: "ETABS".to_string(),
+        source_docs_version: "23.3".to_string(),
+        source_docs_build: "synthetic".to_string(),
     })
     .expect("corpus builds");
 
@@ -26,7 +29,13 @@ fn build_corpus_writes_cards_docgraph_and_search_index() {
         &fs::read_to_string(out.join("manifest.json")).expect("manifest reads"),
     )
     .expect("manifest json");
-    assert_eq!(manifest["schema_version"], 3);
+    assert_eq!(manifest["schema_version"], 4);
+    assert_eq!(manifest["corpus"], "etabs-api-23.3");
+    assert_eq!(manifest["product_name"], "ETABS");
+    assert_eq!(manifest["source_docs_version"], "23.3");
+    assert_eq!(manifest["source_docs_build"], "synthetic");
+    assert_eq!(manifest["source_dir_sha256"], report.source_dir_sha256);
+    assert_eq!(manifest["corpus_sha256"], report.corpus_sha256);
 
     let store = CardStore::open(&out).expect("store opens");
     let hits = store.search("frame force", 5).expect("search succeeds");
@@ -112,6 +121,9 @@ fn search_prefers_camel_case_symbol_match_over_body_noise() {
         source_dir: source,
         out_dir: out.clone(),
         corpus: "etabs-api".to_string(),
+        product_name: "ETABS".to_string(),
+        source_docs_version: "test".to_string(),
+        source_docs_build: "synthetic".to_string(),
     })
     .expect("corpus builds");
 
@@ -135,6 +147,9 @@ fn search_promotes_docgraph_members_with_explicit_aci_version_scope() {
         source_dir: source,
         out_dir: out.clone(),
         corpus: "etabs-api".to_string(),
+        product_name: "ETABS".to_string(),
+        source_docs_version: "test".to_string(),
+        source_docs_build: "synthetic".to_string(),
     })
     .expect("corpus builds");
 
@@ -194,6 +209,9 @@ fn bare_aci318_query_keeps_all_available_versions_in_scope() {
         source_dir: source,
         out_dir: out.clone(),
         corpus: "etabs-api".to_string(),
+        product_name: "ETABS".to_string(),
+        source_docs_version: "test".to_string(),
+        source_docs_build: "synthetic".to_string(),
     })
     .expect("corpus builds");
 
@@ -228,6 +246,9 @@ fn section_definition_question_finds_frame_property_type_enum() {
         source_dir: source,
         out_dir: out.clone(),
         corpus: "etabs-api".to_string(),
+        product_name: "ETABS".to_string(),
+        source_docs_version: "test".to_string(),
+        source_docs_build: "synthetic".to_string(),
     })
     .expect("corpus builds");
 
@@ -240,6 +261,75 @@ fn section_definition_question_finds_frame_property_type_enum() {
         hits.first().and_then(|hit| hit.symbol.as_deref()),
         Some("eFramePropType")
     );
+}
+
+#[test]
+fn repeated_builds_produce_identical_manifest_card_and_corpus_digests() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source = temp.path().join("source");
+    let first_out = temp.path().join("first-index");
+    let second_out = temp.path().join("second-index");
+    write_fixture_corpus(&source);
+
+    let build = |out| {
+        build_corpus(BuildOptions {
+            source_dir: source.clone(),
+            out_dir: out,
+            corpus: "etabs-api-23.3".to_string(),
+            product_name: "ETABS".to_string(),
+            source_docs_version: "23.3".to_string(),
+            source_docs_build: "23.3.0.1234".to_string(),
+        })
+        .expect("corpus builds")
+    };
+
+    let first_report = build(first_out.clone());
+    let second_report = build(second_out.clone());
+    assert_eq!(
+        first_report.source_dir_sha256,
+        second_report.source_dir_sha256
+    );
+    assert_eq!(first_report.corpus_sha256, second_report.corpus_sha256);
+
+    let first_manifest: Manifest = serde_json::from_reader(
+        fs::File::open(first_out.join("manifest.json")).expect("first manifest opens"),
+    )
+    .expect("first manifest reads");
+    let second_manifest: Manifest = serde_json::from_reader(
+        fs::File::open(second_out.join("manifest.json")).expect("second manifest opens"),
+    )
+    .expect("second manifest reads");
+    assert_eq!(first_manifest, second_manifest);
+    assert_eq!(first_manifest.schema_version, 4);
+    assert_eq!(first_manifest.corpus, "etabs-api-23.3");
+    assert_eq!(first_manifest.product_name, "ETABS");
+    assert_eq!(first_manifest.source_docs_version, "23.3");
+    assert_eq!(first_manifest.source_docs_build, "23.3.0.1234");
+    assert_eq!(first_manifest.source_dir_sha256.len(), 64);
+    assert_eq!(first_manifest.corpus_sha256.len(), 64);
+    assert_eq!(
+        fs::read(first_out.join("pages.jsonl")).expect("first pages read"),
+        fs::read(second_out.join("pages.jsonl")).expect("second pages read")
+    );
+
+    let store = CardStore::open(&first_out).expect("store opens");
+    let evidence = store
+        .card_evidence("cAnalysisResults.FrameForce")
+        .expect("evidence reads")
+        .expect("evidence exists");
+    assert_eq!(evidence.card_sha256.len(), 64);
+    assert_eq!(evidence.card_sha256, evidence.card.content_sha256);
+    assert_eq!(evidence.corpus_sha256, first_manifest.corpus_sha256);
+    assert_eq!(evidence.manifest, first_manifest);
+
+    let raw = store
+        .bounded_raw_text("cAnalysisResults.FrameForce", 24)
+        .expect("raw text reads")
+        .expect("raw text exists");
+    assert_eq!(raw.page_id, evidence.card.page_id);
+    assert_eq!(raw.card_sha256, evidence.card_sha256);
+    assert_eq!(raw.text.chars().count(), 24);
+    assert!(raw.truncated);
 }
 
 fn write_fixture_corpus(source: &Path) {

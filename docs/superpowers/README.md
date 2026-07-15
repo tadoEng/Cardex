@@ -18,8 +18,11 @@ Cardex is a Rust-based tool for indexing and searching API documentation from de
 ```bash
 cargo run --bin cardex -- build \
   --source "C:\Work\Code\etabApi\CSI_API_ETABS_v1_html" \
-  --out ".cardex" \
-  --corpus etabs-api
+  --out ".cardex/etabs-api-23.3" \
+  --corpus etabs-api-23.3 \
+  --product-name ETABS \
+  --source-docs-version 23.3 \
+  --source-docs-build 23.3.0
 ```
 
 ### Searching the Index
@@ -84,9 +87,16 @@ cargo run --bin cardex -- related "cAnalysisResults.FrameForce" --index .cardex 
 
 ### Build
 ```bash
-cardex build --source <DIR> --out <DIR> --corpus <NAME>
+cardex build --source <DIR> --out <DIR> --corpus <NAME> \
+  --product-name <NAME> --source-docs-version <VERSION> --source-docs-build <BUILD>
 ```
 Build a searchable index from CHM HTML directory.
+
+### Evidence
+```bash
+cardex evidence <SYMBOL> --index <DIR>
+```
+Return the card, card digest, corpus digest, and manifest metadata as JSON.
 
 ### Search
 ```bash

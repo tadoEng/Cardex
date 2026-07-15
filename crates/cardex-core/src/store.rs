@@ -4,7 +4,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::model::{
-    ApiCard, CardexError, DocGraph, Result, SearchExplanation, SearchHit, SearchPromotion,
+    ApiCard, CardEvidence, CardexError, DocGraph, Manifest, RawTextEvidence, Result,
+    SearchExplanation, SearchHit, SearchPromotion,
 };
 use crate::query::{QueryPlan, plan_query};
 use crate::search::{QueryMode, search_cards};
@@ -15,6 +16,7 @@ pub struct CardStore {
     by_page_id: HashMap<String, usize>,
     by_symbol: HashMap<String, usize>,
     graph: DocGraph,
+    manifest: Manifest,
 }
 
 impl CardStore {
@@ -29,6 +31,14 @@ impl CardStore {
         }
 
         let cards = load_cards(&pages_path)?;
+        let manifest_path = root.join("manifest.json");
+        if !manifest_path.exists() {
+            return Err(CardexError::MissingArtifact(format!(
+                "missing {}",
+                manifest_path.display()
+            )));
+        }
+        let manifest = serde_json::from_reader(File::open(manifest_path)?)?;
         let graph_path = root.join("docgraph.json");
         let graph = if graph_path.exists() {
             serde_json::from_reader(File::open(graph_path)?)?
@@ -50,6 +60,7 @@ impl CardStore {
             by_page_id,
             by_symbol,
             graph,
+            manifest,
         })
     }
 
@@ -69,6 +80,32 @@ impl CardStore {
                     || card.page_id.eq_ignore_ascii_case(key)
             })
             .cloned())
+    }
+
+    pub fn card_evidence(&self, symbol: &str) -> Result<Option<CardEvidence>> {
+        Ok(self.get(symbol)?.map(|card| CardEvidence {
+            card_sha256: card.content_sha256.clone(),
+            corpus_sha256: self.manifest.corpus_sha256.clone(),
+            manifest: self.manifest.clone(),
+            card,
+        }))
+    }
+
+    pub fn bounded_raw_text(
+        &self,
+        symbol: &str,
+        max_chars: usize,
+    ) -> Result<Option<RawTextEvidence>> {
+        Ok(self.get(symbol)?.map(|card| {
+            let text = card.raw_text.chars().take(max_chars).collect::<String>();
+            let truncated = card.raw_text.chars().count() > max_chars;
+            RawTextEvidence {
+                page_id: card.page_id,
+                card_sha256: card.content_sha256,
+                text,
+                truncated,
+            }
+        }))
     }
 
     pub fn members(&self, interface: &str) -> Result<Vec<String>> {
